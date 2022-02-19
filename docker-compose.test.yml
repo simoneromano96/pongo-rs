@@ -1,0 +1,11 @@
+version: '3.6'
+
+services:
+  mongo-5:
+    image: mongo:5
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: example
+    ports:
+      - 27017:27017
