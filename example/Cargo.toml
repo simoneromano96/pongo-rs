@@ -1,0 +1,14 @@
+[package]
+name = "example"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+async-trait = "0.1.52"
+mongodb = "2.1.0"
+pongo-rs = { path = "../pongo-rs" }
+pongo-rs-derive = { path = "../pongo-rs-derive" }
+serde = { version = "1.0.136", features = ["derive"] }
+tokio = "1.17.0"
