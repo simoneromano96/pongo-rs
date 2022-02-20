@@ -1,11 +1,11 @@
 use async_trait::async_trait;
 use mongodb::{bson::doc, options::ClientOptions, Client, Database};
+use mongodb::{bson::oid::ObjectId, results::InsertOneResult};
 use pongo_rs::*;
 use pongo_rs_derive::*;
 use serde::{Deserialize, Serialize};
-use mongodb::{bson::oid::ObjectId};
 
-#[derive(Debug, MyTrait, Serialize, Deserialize)]
+#[derive(Debug, Model, Serialize, Deserialize)]
 #[model(collection_options(name = "books"))]
 struct Book {
     title: String,
@@ -31,16 +31,12 @@ async fn main() {
     let client = make_connection().await.unwrap();
     let db = client.database("books");
 
-    let name = Book::get_collection_name();
-    println!("{name}");
-
     let instance = Book {
         title: "The Grapes of Wrath".to_string(),
         author: "John Steinbeck".to_string(),
     };
 
-    let typed_collection = db.collection::<Book>(name);
-    let insert_result = typed_collection.insert_one(&instance, None).await.unwrap();
+    let insert_result = Book::insert_one(&db, &instance).await.unwrap();
 
     println!("{:#?}", &insert_result.inserted_id);
 
@@ -50,7 +46,7 @@ async fn main() {
         mongodb::bson::Bson::ObjectId(id) => {
             let book = Book::find_by_id(&db, &id).await;
             println!("{book:#?}");
-        },
+        }
         _ => {}
     }
 }

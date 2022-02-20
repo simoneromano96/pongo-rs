@@ -9,13 +9,27 @@
 //     author: String,
 // }
 use async_trait::async_trait;
-use mongodb::{Database, bson::oid::ObjectId};
+use mongodb::{bson::oid::ObjectId, results::InsertOneResult, Database};
+use serde::{de::DeserializeOwned, Serialize};
 
 #[async_trait]
-pub trait Model {
-    fn get_collection_name() -> &'static str;
+pub trait Model
+where
+    Self: Serialize + DeserializeOwned + Send + Sync,
+{
+    /// The name of the collection where this model's data is stored.
+    const COLLECTION_NAME: &'static str;
+    // type Error;
 
-    async fn find_by_id(db: &Database, id: &ObjectId) -> Self;
+    async fn insert_one(
+        db: &Database,
+        document: &Self,
+    ) -> Result<InsertOneResult, mongodb::error::Error>;
+
+    async fn find_by_id(
+        db: &Database,
+        id: &ObjectId,
+    ) -> Result<Option<Self>, mongodb::error::Error>;
 }
 
 // pub async fn temp() {

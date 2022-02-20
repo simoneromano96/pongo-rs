@@ -11,6 +11,7 @@ license = "MIT OR Apache-2.0"
 [dependencies]
 async-trait = "0.1.52"
 mongodb = "2.1.0"
+serde = { version = "1.0.136", features = ["derive"] }
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
