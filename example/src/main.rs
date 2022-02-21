@@ -1,13 +1,12 @@
-use async_trait::async_trait;
-use mongodb::{bson::doc, options::ClientOptions, Client, Database};
-use mongodb::{bson::oid::ObjectId, results::InsertOneResult};
-use pongo_rs::*;
+use futures::TryStreamExt;
+use pongo_rs::prelude::*;
 use pongo_rs_derive::*;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Model, Serialize, Deserialize)]
+#[derive(Default, Debug, Model, Serialize, Deserialize)]
 #[model(collection_options(name = "books"))]
 struct Book {
+    id: Option<ObjectId>,
     title: String,
     author: String,
 }
@@ -34,7 +33,11 @@ async fn main() {
     let instance = Book {
         title: "The Grapes of Wrath".to_string(),
         author: "John Steinbeck".to_string(),
+        ..Default::default()
     };
+
+    // let typed_collection = db.collection::<Book>("books");
+    // typed_collection.find(doc!{ "test": "test" }, None);
 
     let insert_result = Book::insert_one(&db, &instance).await.unwrap();
 
@@ -49,4 +52,8 @@ async fn main() {
         }
         _ => {}
     }
+
+    let books: Vec<Book> = Book::find(&db, None).await.unwrap().try_collect().await.unwrap();
+
+    println!("{books:#?}");
 }

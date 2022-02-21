@@ -1,4 +1,4 @@
-use darling::{ast, FromDeriveInput, FromMeta};
+use darling::{FromDeriveInput, FromMeta};
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
 
@@ -16,7 +16,6 @@ struct CollectionOptions {
 struct Model {
     // The struct ident.
     // ident: syn::Ident,
-
     #[darling(default)]
     collection_options: Option<CollectionOptions>,
 }
@@ -38,34 +37,51 @@ fn impl_model_derive_macro(ast: &syn::DeriveInput) -> TokenStream {
 
     let collection_name = match parsed.collection_options {
         Some(collection_options) if collection_options.name.is_some() => {
-			collection_options.name.unwrap()
+            collection_options.name.unwrap()
         }
-		_ => {
-            name.to_string()
-        }
+        _ => name.to_string(),
     };
-	let collection_name = format_ident!("{}", collection_name);
+    let collection_name = format_ident!("{}", collection_name);
 
     let gen = quote! {
       #[async_trait]
       impl Model for #name {
           const COLLECTION_NAME: &'static str = stringify!(#collection_name);
+          
+          fn set_id(&mut self, id: ObjectId) {
+              self.id = Some(id);
+          }
+
+          fn get_id(&self) -> Option<ObjectId> {
+              self.id
+          }
+
+          fn get_collection(db: &Database) -> Collection<Self> {
+            db.collection::<Self>(Self::COLLECTION_NAME)
+          }
 
           async fn insert_one(
               db: &Database,
               document: &Self,
-          ) -> Result<InsertOneResult, mongodb::error::Error> {
-              let typed_collection = db.collection::<Self>(Self::COLLECTION_NAME);
+          ) -> Result<InsertOneResult, MongoError> {
+              let typed_collection = Self::get_collection(db);
               typed_collection.insert_one(document, None).await
           }
 
           async fn find_by_id(
               db: &Database,
               id: &ObjectId,
-          ) -> Result<Option<Self>, mongodb::error::Error> {
-              let typed_collection = db.collection::<Self>(Self::COLLECTION_NAME);
+          ) -> Result<Option<Self>, MongoError> {
+              let typed_collection = Self::get_collection(db);
               let filter = doc! { "_id": id };
               typed_collection.find_one(filter, None).await
+          }
+
+          async fn find<F>(db: &Database, filter: F) -> Result<Cursor<Self>, MongoError>     
+          where
+            F: Into<Option<Document>> + Send {
+                let typed_collection = Self::get_collection(db);
+                typed_collection.find(filter, None).await
           }
       }
     };

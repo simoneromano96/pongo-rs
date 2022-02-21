@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 async-trait = "0.1.52"
+futures = "0.3.21"
 mongodb = "2.1.0"
 pongo-rs = { path = "../pongo-rs" }
 pongo-rs-derive = { path = "../pongo-rs-derive" }

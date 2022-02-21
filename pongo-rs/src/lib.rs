@@ -9,27 +9,50 @@
 //     author: String,
 // }
 use async_trait::async_trait;
-use mongodb::{bson::oid::ObjectId, results::InsertOneResult, Database};
+use mongodb::{
+    bson::{oid::ObjectId, Document},
+    results::InsertOneResult,
+    Collection, Cursor, Database,
+};
 use serde::{de::DeserializeOwned, Serialize};
+
+pub type MongoError = mongodb::error::Error;
 
 #[async_trait]
 pub trait Model
 where
-    Self: Serialize + DeserializeOwned + Send + Sync,
+    Self: Serialize + DeserializeOwned + Send + Sync + Unpin,
 {
     /// The name of the collection where this model's data is stored.
     const COLLECTION_NAME: &'static str;
     // type Error;
+    /// Get the ID for this model instance.
+    fn get_id(&self) -> Option<ObjectId>;
 
-    async fn insert_one(
-        db: &Database,
-        document: &Self,
-    ) -> Result<InsertOneResult, mongodb::error::Error>;
+    /// Set the ID for this model.
+    fn set_id(&mut self, id: ObjectId);
 
-    async fn find_by_id(
-        db: &Database,
-        id: &ObjectId,
-    ) -> Result<Option<Self>, mongodb::error::Error>;
+    /// Gets mongo collection
+    fn get_collection(db: &Database) -> Collection<Self>;
+
+    async fn insert_one(db: &Database, document: &Self) -> Result<InsertOneResult, MongoError>;
+
+    async fn find_by_id(db: &Database, id: &ObjectId) -> Result<Option<Self>, MongoError>;
+
+    async fn find<F>(db: &Database, filter: F) -> Result<Cursor<Self>, MongoError>
+    where
+        F: Into<Option<Document>> + Send;
+}
+
+pub mod prelude {
+    pub use super::{Model, MongoError};
+    pub use async_trait::async_trait;
+    pub use mongodb::{
+        bson::{doc, oid::ObjectId, Document},
+        options::ClientOptions,
+        results::InsertOneResult,
+        Client, Collection, Cursor, Database,
+    };
 }
 
 // pub async fn temp() {
