@@ -42,6 +42,8 @@ where
     async fn find<F>(db: &Database, filter: F) -> Result<Cursor<Self>, MongoError>
     where
         F: Into<Option<Document>> + Send;
+
+    async fn save(&self, db: &Database) -> Result<(), MongoError>;
 }
 
 pub mod prelude {

@@ -3,9 +3,11 @@ use pongo_rs::prelude::*;
 use pongo_rs_derive::*;
 use serde::{Deserialize, Serialize};
 
-#[derive(Default, Debug, Model, Serialize, Deserialize)]
+#[derive(Clone, Default, Debug, Serialize, Deserialize, Model)]
 #[model(collection_options(name = "books"))]
 struct Book {
+    /// The ID of the model.
+    #[serde(rename = "_id", skip_serializing_if = "Option::is_none")]
     id: Option<ObjectId>,
     title: String,
     author: String,
@@ -41,19 +43,31 @@ async fn main() {
 
     let insert_result = Book::insert_one(&db, &instance).await.unwrap();
 
-    println!("{:#?}", &insert_result.inserted_id);
+    // println!("{:#?}", &insert_result.inserted_id);
 
     let id = insert_result.inserted_id;
 
     match id {
         mongodb::bson::Bson::ObjectId(id) => {
             let book = Book::find_by_id(&db, &id).await;
-            println!("{book:#?}");
+            // println!("{book:#?}");
         }
         _ => {}
     }
 
-    let books: Vec<Book> = Book::find(&db, None).await.unwrap().try_collect().await.unwrap();
+    let books: Vec<Book> = Book::find(&db, None)
+        .await
+        .unwrap()
+        .try_collect()
+        .await
+        .unwrap();
 
-    println!("{books:#?}");
+    // println!("{books:#?}");
+
+    if let Some(book) = books.last() {
+        println!("{book:#?}");
+        let mut c = book.clone();
+        c.author = String::from("Test2");
+        c.save(&db).await.unwrap();
+    }
 }

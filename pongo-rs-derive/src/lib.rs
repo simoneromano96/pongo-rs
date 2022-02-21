@@ -83,7 +83,27 @@ fn impl_model_derive_macro(ast: &syn::DeriveInput) -> TokenStream {
                 let typed_collection = Self::get_collection(db);
                 typed_collection.find(filter, None).await
           }
-      }
+
+          async fn save(&self, db: &Database) -> Result<(), MongoError> {
+            match self.get_id() {
+                Some(_) => {
+                    let mut document = mongodb::bson::to_document(&self).unwrap();
+                    println!("{:#?}", document);
+                    if let Some(id) = document.remove("_id") {
+                        let update_query = doc! { "$set": document };
+                        let typed_collection = Self::get_collection(db);
+                        typed_collection
+                            .update_one(doc! { "_id": id }, update_query, None)
+                            .await?;
+                    }
+                }
+                None => {
+                    Self::insert_one(db, self).await?;
+                }
+            };
+            Ok(())
+        }
+          }
     };
 
     gen.into()
