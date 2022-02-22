@@ -1,10 +1,12 @@
 use futures::TryStreamExt;
+use mongodb::IndexModel;
 use pongo_rs::prelude::*;
 use pongo_rs_derive::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Default, Debug, Serialize, Deserialize, Model)]
 #[model(collection_options(name = "books"))]
+#[model(indexes(keys(key = "title", order = 1), keys(key = "author", order = 1)))]
 struct Book {
     /// The ID of the model.
     #[serde(rename = "_id", skip_serializing_if = "Option::is_none")]
@@ -43,26 +45,24 @@ async fn main() {
 
     let insert_result = Book::insert_one(&db, &instance).await.unwrap();
 
-    // println!("{:#?}", &insert_result.inserted_id);
-
     let id = insert_result.inserted_id;
 
     match id {
         mongodb::bson::Bson::ObjectId(id) => {
             let book = Book::find_by_id(&db, &id).await;
-            // println!("{book:#?}");
+            println!("Created book: {book:#?}");
         }
         _ => {}
     }
 
-    let books: Vec<Book> = Book::find(&db, None)
+    let books: Vec<Book> = Book::find(&db, None, None)
         .await
         .unwrap()
         .try_collect()
         .await
         .unwrap();
 
-    // println!("{books:#?}");
+    println!("All books: {books:#?}");
 
     if let Some(book) = books.last() {
         println!("{book:#?}");
@@ -70,4 +70,7 @@ async fn main() {
         c.author = String::from("Test2");
         c.save(&db).await.unwrap();
     }
+
+    // let index_builder = IndexModel::builder();
+    // let index_model = index_builder.keys(doc! { "col1": 1 }).build();
 }

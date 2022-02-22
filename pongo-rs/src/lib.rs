@@ -10,9 +10,9 @@
 // }
 use async_trait::async_trait;
 use mongodb::{
-    bson::{oid::ObjectId, Document},
+    bson::{oid::ObjectId, Document, doc},
     results::InsertOneResult,
-    Collection, Cursor, Database,
+    Collection, Cursor, Database, options::FindOptions,
 };
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -25,25 +25,64 @@ where
 {
     /// The name of the collection where this model's data is stored.
     const COLLECTION_NAME: &'static str;
-    // type Error;
     /// Get the ID for this model instance.
-    fn get_id(&self) -> Option<ObjectId>;
-
-    /// Set the ID for this model.
     fn set_id(&mut self, id: ObjectId);
 
+    /// Set the ID for this model.
+    fn get_id(&self) -> Option<ObjectId>;
+
     /// Gets mongo collection
-    fn get_collection(db: &Database) -> Collection<Self>;
+    fn get_collection(db: &Database) -> Collection<Self> {
+        db.collection::<Self>(Self::COLLECTION_NAME)
+    }
 
-    async fn insert_one(db: &Database, document: &Self) -> Result<InsertOneResult, MongoError>;
+    async fn insert_one(
+        db: &Database,
+        document: &Self,
+    ) -> Result<InsertOneResult, MongoError> {
+        let typed_collection = Self::get_collection(db);
+        typed_collection.insert_one(document, None).await
+    }
 
-    async fn find_by_id(db: &Database, id: &ObjectId) -> Result<Option<Self>, MongoError>;
+    async fn find_by_id(
+        db: &Database,
+        id: &ObjectId,
+    ) -> Result<Option<Self>, MongoError> {
+        let typed_collection = Self::get_collection(db);
+        let filter = doc! { "_id": id };
+        typed_collection.find_one(filter, None).await
+    }
 
-    async fn find<F>(db: &Database, filter: F) -> Result<Cursor<Self>, MongoError>
+    /// Find all instances of this model matching the given query.
+    async fn find<F, O>(db: &Database, filter: F, options: O) -> Result<Cursor<Self>, MongoError>
     where
-        F: Into<Option<Document>> + Send;
+        F: Into<Option<Document>> + Send,
+        O: Into<Option<FindOptions>> + Send,
+    {
+        let typed_collection = Self::get_collection(db);
+        typed_collection.find(filter, options).await
+    }
 
-    async fn save(&self, db: &Database) -> Result<(), MongoError>;
+
+    async fn save(&self, db: &Database) -> Result<(), MongoError> {
+        match self.get_id() {
+            Some(_) => {
+                let mut document = mongodb::bson::to_document(&self).unwrap();
+                println!("{:#?}", document);
+                if let Some(id) = document.remove("_id") {
+                    let update_query = doc! { "$set": document };
+                    let typed_collection = Self::get_collection(db);
+                    typed_collection
+                        .update_one(doc! { "_id": id }, update_query, None)
+                        .await?;
+                }
+            }
+            None => {
+                Self::insert_one(db, self).await?;
+            }
+        };
+        Ok(())
+    }
 }
 
 pub mod prelude {

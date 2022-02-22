@@ -2,9 +2,25 @@ use darling::{FromDeriveInput, FromMeta};
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
 
+/// A single index.
+#[derive(Debug, FromMeta)]
+struct RawIndex {
+    key: String,
+    order: i8,
+}
+
+/// The raw model used for deriving indices on models.
+#[derive(Debug, FromMeta)]
+struct RawIndexModel {
+    #[darling(default)]
+    #[darling(multiple)]
+    keys: Vec<RawIndex>,
+}
+
 #[derive(FromMeta, Debug)]
 struct CollectionOptions {
     #[darling(default)]
+    /// Collection name
     name: Option<String>,
 }
 
@@ -14,10 +30,13 @@ struct CollectionOptions {
 #[derive(Debug, FromDeriveInput)]
 #[darling(attributes(model), supports(struct_any))]
 struct Model {
-    // The struct ident.
-    // ident: syn::Ident,
     #[darling(default)]
+    /// All collection options
     collection_options: Option<CollectionOptions>,
+    /// Collection indexes
+    #[darling(default)]
+    #[darling(multiple)]
+    indexes: Vec<RawIndexModel>,
 }
 
 #[proc_macro_derive(Model, attributes(model))]
@@ -46,64 +65,18 @@ fn impl_model_derive_macro(ast: &syn::DeriveInput) -> TokenStream {
     let gen = quote! {
       #[async_trait]
       impl Model for #name {
-          const COLLECTION_NAME: &'static str = stringify!(#collection_name);
+        const COLLECTION_NAME: &'static str = stringify!(#collection_name);
           
-          fn set_id(&mut self, id: ObjectId) {
-              self.id = Some(id);
-          }
-
-          fn get_id(&self) -> Option<ObjectId> {
-              self.id
-          }
-
-          fn get_collection(db: &Database) -> Collection<Self> {
-            db.collection::<Self>(Self::COLLECTION_NAME)
-          }
-
-          async fn insert_one(
-              db: &Database,
-              document: &Self,
-          ) -> Result<InsertOneResult, MongoError> {
-              let typed_collection = Self::get_collection(db);
-              typed_collection.insert_one(document, None).await
-          }
-
-          async fn find_by_id(
-              db: &Database,
-              id: &ObjectId,
-          ) -> Result<Option<Self>, MongoError> {
-              let typed_collection = Self::get_collection(db);
-              let filter = doc! { "_id": id };
-              typed_collection.find_one(filter, None).await
-          }
-
-          async fn find<F>(db: &Database, filter: F) -> Result<Cursor<Self>, MongoError>     
-          where
-            F: Into<Option<Document>> + Send {
-                let typed_collection = Self::get_collection(db);
-                typed_collection.find(filter, None).await
-          }
-
-          async fn save(&self, db: &Database) -> Result<(), MongoError> {
-            match self.get_id() {
-                Some(_) => {
-                    let mut document = mongodb::bson::to_document(&self).unwrap();
-                    println!("{:#?}", document);
-                    if let Some(id) = document.remove("_id") {
-                        let update_query = doc! { "$set": document };
-                        let typed_collection = Self::get_collection(db);
-                        typed_collection
-                            .update_one(doc! { "_id": id }, update_query, None)
-                            .await?;
-                    }
-                }
-                None => {
-                    Self::insert_one(db, self).await?;
-                }
-            };
-            Ok(())
+        /// Get the ID for this model instance.
+        fn set_id(&mut self, id: ObjectId) {
+          self.id = Some(id);
         }
-          }
+
+        /// Set the ID for this model.
+        fn get_id(&self) -> Option<ObjectId> {
+          self.id
+        }
+      }
     };
 
     gen.into()
