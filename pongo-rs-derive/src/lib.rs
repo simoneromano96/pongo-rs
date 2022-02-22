@@ -1,27 +1,59 @@
+use std::collections::HashMap;
+
 use darling::{FromDeriveInput, FromMeta};
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
-
-/// A single index.
-#[derive(Debug, FromMeta)]
-struct RawIndex {
-    key: String,
-    order: i8,
-}
 
 /// The raw model used for deriving indices on models.
 #[derive(Debug, FromMeta)]
 struct RawIndexModel {
     #[darling(default)]
     #[darling(multiple)]
-    keys: Vec<RawIndex>,
+    key: Vec<HashMap<String, i8>>,
 }
 
 #[derive(FromMeta, Debug)]
 struct CollectionOptions {
     #[darling(default)]
+    #[darling(map = "CollectionOptions::lower_case")]
     /// Collection name
     name: Option<String>,
+}
+
+impl CollectionOptions {
+    fn lower_case(arg: Option<String>) -> Option<String> {
+        if let Some(name) = arg {
+            let new_name = name.chars().enumerate().fold(
+                String::with_capacity(name.capacity()),
+                |mut acc, (index, character)| {
+                    if index == 0 {
+                        acc.push(character.to_ascii_lowercase());
+                    } else {
+                        acc.push(character);
+                    }
+                    acc
+                },
+            );
+            // .map(|(index, character)| {
+            //     if index == 0 {
+            //         character.to_ascii_lowercase()
+            //     } else {
+            //         character
+            //     }
+            // })
+            // .collect();
+            // .next() {
+            //     if index == 0 {
+            //         new_name.push(character.to_ascii_lowercase());
+            //     } else {
+            //         new_name.push(character);
+            //     }
+            // }
+            Some(new_name)
+        } else {
+            arg
+        }
+    }
 }
 
 /// Support parsing from a full derive input. Unlike FromMeta, this isn't
@@ -36,7 +68,7 @@ struct Model {
     /// Collection indexes
     #[darling(default)]
     #[darling(multiple)]
-    indexes: Vec<RawIndexModel>,
+    index: Vec<RawIndexModel>,
 }
 
 #[proc_macro_derive(Model, attributes(model))]
@@ -66,7 +98,7 @@ fn impl_model_derive_macro(ast: &syn::DeriveInput) -> TokenStream {
       #[async_trait]
       impl Model for #name {
         const COLLECTION_NAME: &'static str = stringify!(#collection_name);
-          
+
         /// Get the ID for this model instance.
         fn set_id(&mut self, id: ObjectId) {
           self.id = Some(id);
