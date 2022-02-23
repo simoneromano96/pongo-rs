@@ -2,14 +2,45 @@ use std::collections::HashMap;
 
 use darling::{FromDeriveInput, FromMeta};
 use proc_macro::TokenStream;
-use quote::{format_ident, quote};
+use proc_macro2::TokenStream as TokenStream2;
+use quote::{format_ident, quote, ToTokens};
 
 /// The raw model used for deriving indices on models.
 #[derive(Debug, FromMeta)]
 struct RawIndexModel {
     #[darling(default)]
     #[darling(multiple)]
-    key: Vec<HashMap<String, i8>>,
+    #[darling(rename = "key")]
+    keys: Vec<HashMap<String, i32>>,
+}
+
+impl From<&RawIndexModel> for mongodb::IndexModel {
+    fn from(raw_index_model: &RawIndexModel) -> Self {
+        let index_builder = mongodb::IndexModel::builder();
+        let keys =
+            raw_index_model
+                .keys
+                .iter()
+                .fold(mongodb::bson::Document::new(), |mut acc, index| {
+                    index.iter().for_each(|(key, order)| {
+                        acc.extend([(key.clone(), order.into())]);
+                    });
+                    acc
+                });
+        let index_model = index_builder.keys(keys).options(None).build();
+        index_model
+    }
+}
+
+impl ToTokens for RawIndexModel {
+    fn to_tokens(&self, input: &mut TokenStream2) {
+        let keys = self.keys;
+        // vec![]
+        // HashMap::from_iter(vec![("key", "value")]);
+        let token_stream = quote!(#(#keys),*);
+        println!("{}", &token_stream);
+        input.extend([token_stream]);
+    }
 }
 
 #[derive(FromMeta, Debug)]
@@ -34,21 +65,6 @@ impl CollectionOptions {
                     acc
                 },
             );
-            // .map(|(index, character)| {
-            //     if index == 0 {
-            //         character.to_ascii_lowercase()
-            //     } else {
-            //         character
-            //     }
-            // })
-            // .collect();
-            // .next() {
-            //     if index == 0 {
-            //         new_name.push(character.to_ascii_lowercase());
-            //     } else {
-            //         new_name.push(character);
-            //     }
-            // }
             Some(new_name)
         } else {
             arg
@@ -68,7 +84,8 @@ struct Model {
     /// Collection indexes
     #[darling(default)]
     #[darling(multiple)]
-    index: Vec<RawIndexModel>,
+    #[darling(rename = "index")]
+    indexes: Vec<RawIndexModel>,
 }
 
 #[proc_macro_derive(Model, attributes(model))]
@@ -93,6 +110,9 @@ fn impl_model_derive_macro(ast: &syn::DeriveInput) -> TokenStream {
         _ => name.to_string(),
     };
     let collection_name = format_ident!("{}", collection_name);
+    let indexes = parsed.indexes;
+    // let index_models: Vec<mongodb::IndexModel> =
+    //     parsed.index.iter().map(|item| item.into()).collect();
 
     let gen = quote! {
       #[async_trait]
@@ -107,6 +127,11 @@ fn impl_model_derive_macro(ast: &syn::DeriveInput) -> TokenStream {
         /// Set the ID for this model.
         fn get_id(&self) -> Option<ObjectId> {
           self.id
+        }
+
+        /// Get the vector of index models for this model.
+        fn get_indexes() -> Vec<IndexModel> {
+            vec![#(#indexes),*]
         }
       }
     };

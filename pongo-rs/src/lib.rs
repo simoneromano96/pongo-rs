@@ -10,9 +10,10 @@
 // }
 use async_trait::async_trait;
 use mongodb::{
-    bson::{oid::ObjectId, Document, doc},
+    bson::{doc, oid::ObjectId, Document},
+    options::FindOptions,
     results::InsertOneResult,
-    Collection, Cursor, Database, options::FindOptions,
+    Collection, Cursor, Database, IndexModel,
 };
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -36,18 +37,12 @@ where
         db.collection::<Self>(Self::COLLECTION_NAME)
     }
 
-    async fn insert_one(
-        db: &Database,
-        document: &Self,
-    ) -> Result<InsertOneResult, MongoError> {
+    async fn insert_one(db: &Database, document: &Self) -> Result<InsertOneResult, MongoError> {
         let typed_collection = Self::get_collection(db);
         typed_collection.insert_one(document, None).await
     }
 
-    async fn find_by_id(
-        db: &Database,
-        id: &ObjectId,
-    ) -> Result<Option<Self>, MongoError> {
+    async fn find_by_id(db: &Database, id: &ObjectId) -> Result<Option<Self>, MongoError> {
         let typed_collection = Self::get_collection(db);
         let filter = doc! { "_id": id };
         typed_collection.find_one(filter, None).await
@@ -62,7 +57,6 @@ where
         let typed_collection = Self::get_collection(db);
         typed_collection.find(filter, options).await
     }
-
 
     async fn save(&self, db: &Database) -> Result<(), MongoError> {
         match self.get_id() {
@@ -83,6 +77,18 @@ where
         };
         Ok(())
     }
+
+    /// Get the vector of index models for this model.
+    fn get_indexes() -> Vec<IndexModel> {
+        vec![]
+    }
+
+    // async fn sync(db: &Database) -> Result<(), MongoError> {
+    //     let coll = Self::get_collection(db);
+    //     let current_indexes = coll.list_indexes(None).await?;
+    //     sync_model_indexes(db, &coll, Self::indexes(), current_indexes).await?;
+    //     Ok(())
+    // }
 }
 
 pub mod prelude {
