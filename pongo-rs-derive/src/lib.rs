@@ -32,17 +32,6 @@ impl From<&RawIndexModel> for mongodb::IndexModel {
     }
 }
 
-impl ToTokens for RawIndexModel {
-    fn to_tokens(&self, input: &mut TokenStream2) {
-        let keys = self.keys;
-        // vec![]
-        // HashMap::from_iter(vec![("key", "value")]);
-        let token_stream = quote!(#(#keys),*);
-        println!("{}", &token_stream);
-        input.extend([token_stream]);
-    }
-}
-
 #[derive(FromMeta, Debug)]
 struct CollectionOptions {
     #[darling(default)]
@@ -111,8 +100,21 @@ fn impl_model_derive_macro(ast: &syn::DeriveInput) -> TokenStream {
     };
     let collection_name = format_ident!("{}", collection_name);
     let indexes = parsed.indexes;
-    // let index_models: Vec<mongodb::IndexModel> =
-    //     parsed.index.iter().map(|item| item.into()).collect();
+    let index_models: Vec<mongodb::IndexModel> = indexes.iter().map(|item| item.into()).collect();
+    println!("{index_models:#?}");
+
+    // let i = index_models.get(0).unwrap();
+    // let v = mongodb::bson::to_vec(&i.keys).unwrap();
+    let vv: Vec<Vec<u8>> = index_models
+        .iter()
+        .map(|i| mongodb::bson::to_vec(&i.keys).unwrap())
+        .collect();
+
+    // println!("{vv:#?}");
+    // println!("{v:#?}");
+    let index_options = mongodb::options::IndexOptions::builder();
+    let index = index_options.background(true).build();
+    // index;
 
     let gen = quote! {
       #[async_trait]
@@ -131,7 +133,13 @@ fn impl_model_derive_macro(ast: &syn::DeriveInput) -> TokenStream {
 
         /// Get the vector of index models for this model.
         fn get_indexes() -> Vec<IndexModel> {
-            vec![#(#indexes),*]
+            let bytes = vec![#(vec![#(#vv),*]),*];
+
+            bytes.iter().map(|bytes| {
+                let doc = Document::from_reader(std::io::Cursor::new(bytes)).unwrap();
+                let index_builder = IndexModel::builder();
+                index_builder.keys(doc).build()
+            }).collect()
         }
       }
     };

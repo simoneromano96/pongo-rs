@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Default, Debug, Serialize, Deserialize, Model)]
 #[model(collection_options(name = "books"))]
 #[model(index(key(title = 1), key(author = -1)))]
+#[model(index(key(title = -1), key(author = 1)))]
 struct Book {
     /// The ID of the model.
     #[serde(rename = "_id", skip_serializing_if = "Option::is_none")]
