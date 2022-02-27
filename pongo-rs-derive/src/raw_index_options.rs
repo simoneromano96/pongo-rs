@@ -124,43 +124,34 @@ impl Into<mongodb::options::IndexOptions> for &RawIndexOptions {
 
         builder
             .background(self.background)
-            .expire_after(
-                self.expire_after
-                    .map_or(None, |expire| Some(std::time::Duration::from_secs(expire))),
-            )
+            .expire_after(self.expire_after.map(std::time::Duration::from_secs))
             .name(self.name.clone())
             .sparse(self.sparse)
             .storage_engine(
                 self.storage_engine
                     .clone()
-                    .map_or(None, |storage_engine| Some(storage_engine.0)),
+                    .map(|storage_engine| storage_engine.0),
             )
             .unique(self.unique)
-            .version(self.version.map_or(None, |version| {
-                Some(match version {
-                    0 => mongodb::options::IndexVersion::V0,
-                    1 => mongodb::options::IndexVersion::V1,
-                    2 => mongodb::options::IndexVersion::V2,
-                    _custom => mongodb::options::IndexVersion::Custom(_custom),
-                })
+            .version(self.version.map(|version| match version {
+                0 => mongodb::options::IndexVersion::V0,
+                1 => mongodb::options::IndexVersion::V1,
+                2 => mongodb::options::IndexVersion::V2,
+                _custom => mongodb::options::IndexVersion::Custom(_custom),
             }))
             .default_language(self.default_language.clone())
             .language_override(self.language_override.clone())
-            .text_index_version(self.text_index_version.map_or(None, |version| {
-                Some(match version {
-                    1 => mongodb::options::TextIndexVersion::V1,
-                    2 => mongodb::options::TextIndexVersion::V2,
-                    3 => mongodb::options::TextIndexVersion::V3,
-                    _custom => mongodb::options::TextIndexVersion::Custom(_custom),
-                })
+            .text_index_version(self.text_index_version.map(|version| match version {
+                1 => mongodb::options::TextIndexVersion::V1,
+                2 => mongodb::options::TextIndexVersion::V2,
+                3 => mongodb::options::TextIndexVersion::V3,
+                _custom => mongodb::options::TextIndexVersion::Custom(_custom),
             }))
-            .weights(self.weights.clone().map_or(None, |weights| Some(weights.0)))
-            .sphere_2d_index_version(self.sphere_2d_index_version.map_or(None, |version| {
-                Some(match version {
-                    2 => mongodb::options::Sphere2DIndexVersion::V2,
-                    3 => mongodb::options::Sphere2DIndexVersion::V3,
-                    _custom => mongodb::options::Sphere2DIndexVersion::Custom(_custom),
-                })
+            .weights(self.weights.clone().map(|weights| weights.0))
+            .sphere_2d_index_version(self.sphere_2d_index_version.map(|version| match version {
+                2 => mongodb::options::Sphere2DIndexVersion::V2,
+                3 => mongodb::options::Sphere2DIndexVersion::V3,
+                _custom => mongodb::options::Sphere2DIndexVersion::Custom(_custom),
             }))
             .bits(self.bits)
             .max(self.max)
@@ -169,14 +160,12 @@ impl Into<mongodb::options::IndexOptions> for &RawIndexOptions {
             .partial_filter_expression(
                 self.partial_filter_expression
                     .clone()
-                    .map_or(None, |partial_filter_expression| {
-                        Some(partial_filter_expression.0)
-                    }),
+                    .map(|partial_filter_expression| partial_filter_expression.0),
             )
             .wildcard_projection(
                 self.wildcard_projection
                     .clone()
-                    .map_or(None, |wildcard_projection| Some(wildcard_projection.0)),
+                    .map(|wildcard_projection| wildcard_projection.0),
             )
             .hidden(self.hidden)
             .build()

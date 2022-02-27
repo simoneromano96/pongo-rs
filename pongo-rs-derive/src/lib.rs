@@ -35,8 +35,8 @@ impl From<&RawIndexModel> for mongodb::IndexModel {
             Some(options) => index_builder.options(Some(options.into())),
             _ => index_builder.options(None),
         };
-        let index_model = index_builder.build();
-        index_model
+        
+        index_builder.build()
     }
 }
 
@@ -98,7 +98,7 @@ pub fn model_derive(input: TokenStream) -> TokenStream {
 }
 
 fn impl_model_derive_macro(ast: &syn::DeriveInput) -> TokenStream {
-    let parsed: Model = FromDeriveInput::from_derive_input(&ast).unwrap();
+    let parsed: Model = FromDeriveInput::from_derive_input(ast).unwrap();
     println!("{parsed:#?}");
     let name = &parsed.ident;
 
