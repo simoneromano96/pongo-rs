@@ -12,4 +12,5 @@ mongodb = "2.1.0"
 pongo-rs = { path = "../pongo-rs" }
 pongo-rs-derive = { path = "../pongo-rs-derive" }
 serde = { version = "1.0.136", features = ["derive"] }
+serde_json = "1.0.79"
 tokio = "1.17.0"

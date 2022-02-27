@@ -1,12 +1,40 @@
 use darling::FromMeta;
 
 #[derive(Clone, Debug)]
-pub(crate) struct CustomDocument(mongodb::bson::Document);
+pub(crate) struct Document(mongodb::bson::Document);
 
-impl FromMeta for CustomDocument {
+impl FromMeta for Document {
     fn from_string(value: &str) -> darling::Result<Self> {
         println!("{value:#?}");
-        let value = mongodb::bson::from_slice(value.as_bytes());
+        let value = serde_json::from_str(value);
+        match value {
+            Ok(document) => Ok(Self(document)),
+            Err(error) => Err(darling::Error::unsupported_shape(&format!("{error}"))),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct Collation(mongodb::options::Collation);
+
+impl FromMeta for Collation {
+    fn from_string(value: &str) -> darling::Result<Self> {
+        println!("{value:#?}");
+        let value = serde_json::from_str(value);
+        match value {
+            Ok(document) => Ok(Self(document)),
+            Err(error) => Err(darling::Error::unsupported_shape(&format!("{error}"))),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct IndexOptions(mongodb::options::IndexOptions);
+
+impl FromMeta for IndexOptions {
+    fn from_string(value: &str) -> darling::Result<Self> {
+        println!("{value:#?}");
+        let value = serde_json::from_str(value);
         match value {
             Ok(document) => Ok(Self(document)),
             Err(error) => Err(darling::Error::unsupported_shape(&format!("{error}"))),
@@ -44,7 +72,7 @@ pub(crate) struct RawIndexOptions {
     /// Allows users to configure the storage engine on a per-index basis when creating
     /// an index.
     #[darling(default)]
-    pub(crate) storage_engine: Option<CustomDocument>,
+    pub(crate) storage_engine: Option<Document>,
     /// Forces the index to be unique so the collection will not accept documents where the index
     /// key value matches an existing value in the index. The default value is false.
     #[darling(default)]
@@ -72,7 +100,7 @@ pub(crate) struct RawIndexOptions {
 
     /// For `text` indexes, a document that contains field and weight pairs.
     #[darling(default)]
-    pub(crate) weights: Option<CustomDocument>,
+    pub(crate) weights: Option<Document>,
 
     /// The `2dsphere` index version number.
     /// As of MongoDB 3.2, version 3 is the default. Version 2 is the default in MongoDB 2.6 and
@@ -103,14 +131,15 @@ pub(crate) struct RawIndexOptions {
     /// If specified, the index only references documents that match the filter
     /// expression. See Partial Indexes for more information.
     #[darling(default)]
-    pub(crate) partial_filter_expression: Option<CustomDocument>,
+    pub(crate) partial_filter_expression: Option<Document>,
 
-    // /// Specifies the collation for the index.
-    // #[darling(default)]
-    // pub collation: Option<mongodb::options::Collation>,
+    /// Specifies the collation for the index.
+    #[darling(default)]
+    pub(crate) collation: Option<Collation>,
+
     /// Allows users to include or exclude specific field paths from a wildcard index.
     #[darling(default)]
-    pub(crate) wildcard_projection: Option<CustomDocument>,
+    pub(crate) wildcard_projection: Option<Document>,
 
     /// A flag that determines whether the index is hidden from the query planner. A
     /// hidden index is not evaluated as part of the query plan selection.
@@ -118,56 +147,62 @@ pub(crate) struct RawIndexOptions {
     pub(crate) hidden: Option<bool>,
 }
 
-impl Into<mongodb::options::IndexOptions> for &RawIndexOptions {
-    fn into(self) -> mongodb::options::IndexOptions {
+impl From<&RawIndexOptions> for mongodb::options::IndexOptions {
+    fn from(raw_options: &RawIndexOptions) -> Self {
         let builder = mongodb::options::IndexOptions::builder();
 
         builder
-            .background(self.background)
-            .expire_after(self.expire_after.map(std::time::Duration::from_secs))
-            .name(self.name.clone())
-            .sparse(self.sparse)
+            .background(raw_options.background)
+            .expire_after(raw_options.expire_after.map(std::time::Duration::from_secs))
+            .name(raw_options.name.clone())
+            .sparse(raw_options.sparse)
             .storage_engine(
-                self.storage_engine
+                raw_options
+                    .storage_engine
                     .clone()
                     .map(|storage_engine| storage_engine.0),
             )
-            .unique(self.unique)
-            .version(self.version.map(|version| match version {
+            .unique(raw_options.unique)
+            .version(raw_options.version.map(|version| match version {
                 0 => mongodb::options::IndexVersion::V0,
                 1 => mongodb::options::IndexVersion::V1,
                 2 => mongodb::options::IndexVersion::V2,
                 _custom => mongodb::options::IndexVersion::Custom(_custom),
             }))
-            .default_language(self.default_language.clone())
-            .language_override(self.language_override.clone())
-            .text_index_version(self.text_index_version.map(|version| match version {
+            .default_language(raw_options.default_language.clone())
+            .language_override(raw_options.language_override.clone())
+            .text_index_version(raw_options.text_index_version.map(|version| match version {
                 1 => mongodb::options::TextIndexVersion::V1,
                 2 => mongodb::options::TextIndexVersion::V2,
                 3 => mongodb::options::TextIndexVersion::V3,
                 _custom => mongodb::options::TextIndexVersion::Custom(_custom),
             }))
-            .weights(self.weights.clone().map(|weights| weights.0))
-            .sphere_2d_index_version(self.sphere_2d_index_version.map(|version| match version {
-                2 => mongodb::options::Sphere2DIndexVersion::V2,
-                3 => mongodb::options::Sphere2DIndexVersion::V3,
-                _custom => mongodb::options::Sphere2DIndexVersion::Custom(_custom),
-            }))
-            .bits(self.bits)
-            .max(self.max)
-            .min(self.min)
-            .bucket_size(self.bucket_size)
+            .weights(raw_options.weights.clone().map(|weights| weights.0))
+            .sphere_2d_index_version(raw_options.sphere_2d_index_version.map(
+                |version| match version {
+                    2 => mongodb::options::Sphere2DIndexVersion::V2,
+                    3 => mongodb::options::Sphere2DIndexVersion::V3,
+                    _custom => mongodb::options::Sphere2DIndexVersion::Custom(_custom),
+                },
+            ))
+            .bits(raw_options.bits)
+            .max(raw_options.max)
+            .min(raw_options.min)
+            .bucket_size(raw_options.bucket_size)
             .partial_filter_expression(
-                self.partial_filter_expression
+                raw_options
+                    .partial_filter_expression
                     .clone()
                     .map(|partial_filter_expression| partial_filter_expression.0),
             )
+            .collation(raw_options.collation.clone().map(|collation| collation.0))
             .wildcard_projection(
-                self.wildcard_projection
+                raw_options
+                    .wildcard_projection
                     .clone()
                     .map(|wildcard_projection| wildcard_projection.0),
             )
-            .hidden(self.hidden)
+            .hidden(raw_options.hidden)
             .build()
     }
 }

@@ -45,6 +45,8 @@ async fn main() {
         ..Default::default()
     };
 
+    Book::sync(&db, None).await.unwrap();
+
     // let typed_collection = db.collection::<Book>("books");
     // typed_collection.find(doc!{ "test": "test" }, None);
 

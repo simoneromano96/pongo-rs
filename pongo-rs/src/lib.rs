@@ -83,12 +83,26 @@ where
         vec![]
     }
 
-    // async fn sync(db: &Database) -> Result<(), MongoError> {
-    //     let coll = Self::get_collection(db);
-    //     let current_indexes = coll.list_indexes(None).await?;
-    //     sync_model_indexes(db, &coll, Self::indexes(), current_indexes).await?;
-    //     Ok(())
-    // }
+    async fn sync<O>(db: &Database, options: O) -> Result<(), MongoError>
+    where
+        O: Into<Option<mongodb::options::CreateIndexOptions>> + Send,
+    {
+        let coll = Self::get_collection(db);
+        let indexes = Self::get_indexes();
+        sync_indexes(&coll, indexes, options).await
+    }
+}
+
+async fn sync_indexes<T, O>(
+    collection: &Collection<T>,
+    indexes: Vec<IndexModel>,
+    options: O,
+) -> Result<(), MongoError>
+where
+    O: Into<Option<mongodb::options::CreateIndexOptions>> + Send,
+{
+    collection.create_indexes(indexes, options).await?;
+    Ok(())
 }
 
 pub mod prelude {
@@ -101,53 +115,3 @@ pub mod prelude {
         Client, Collection, Cursor, Database,
     };
 }
-
-// pub async fn temp() {
-//     let client = make_connection().await.unwrap();
-
-//     let db = client.database("books");
-
-//     let books = vec![
-//         Book {
-//             title: "The Grapes of Wrath".to_string(),
-//             author: "John Steinbeck".to_string(),
-//         },
-//         Book {
-//             title: "To Kill a Mockingbird".to_string(),
-//             author: "Harper Lee".to_string(),
-//         },
-//     ];
-
-//     // Get a handle to a collection of `Book`.
-//     let typed_collection = db.collection::<Book>("books");
-
-//     // Insert the books into "mydb.books" collection, no manual conversion to BSON necessary.
-//     typed_collection.insert_many(books, None).await.unwrap();
-
-//     // Query the books in the collection with a filter and an option.
-//     // let filter = doc! { "author": "George Orwell" };
-//     let find_options = FindOptions::builder().sort(doc! { "title": 1 }).build();
-//     let mut cursor = typed_collection.find(None, find_options).await.unwrap();
-
-//     // Iterate over the results of the cursor.
-//     while let Some(book) = cursor.try_next().await.unwrap() {
-//         println!("{book:#?}");
-//     }
-
-//     let books: Vec<Book> = typed_collection.find(None, None).await.unwrap().try_collect().await.unwrap();
-//     println!("{books:#?}");
-// }
-
-// #[cfg(test)]
-// mod tests {
-//     #[tokio::test]
-//     async fn it_works() {
-//         let result = 2 + 2;
-//         assert_eq!(result, 4);
-//     }
-
-//     #[tokio::test]
-//     async fn temp() {
-//         super::temp().await;
-//     }
-// }
