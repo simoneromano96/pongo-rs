@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 #[model(collection_options(name = "books"))]
 #[model(index(key(title = 1), key(author = -1)))]
 #[model(index(key(title = -1), key(author = 1)))]
+#[model(index(key(title = 1), key(author = 1), options(background = true)))]
 struct Book {
     /// The ID of the model.
     #[serde(rename = "_id", skip_serializing_if = "Option::is_none")]
@@ -34,6 +35,9 @@ async fn main() {
     // println!("hello");
     let client = make_connection().await.unwrap();
     let db = client.database("books");
+
+    let indexes = Book::get_indexes();
+    println!("indexes: {:?}", indexes);
 
     let instance = Book {
         title: "The Grapes of Wrath".to_string(),
